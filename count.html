@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>薪資計算系統</title>
+  <!-- 引入 html2canvas 套件，用於匯出圖片 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root {
+      --primary-color: #2c3e50;
+      --secondary-color: #3498db;
+      --background-color: #edf1ec;
+      --border-color: #bbb;
+      --other-color: #f39c12;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* 頁首與導覽 */
+    header {
+      background-color: var(--primary-color);
+      color: white;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    nav {
+      display: flex;
+      justify-content: center;
+      background-color: var(--background-color);
+      padding: 0.5rem;
+    }
+
+    .tab-button {
+      flex: 1;
+      max-width: 200px;
+      padding: 0.75rem;
+      border: none;
+      background-color: var(--other-color);
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background-color 0.3s;
+    }
+
+    .tab-button.active {
+      border: 2px solid rgba(238, 170, 44, 0.89);
+      background-color: var(--secondary-color);
+      color: white;
+      position: relative;
+      animation: pulse-bg 2s infinite;
+    }
+
+    .tab-button.active::before {
+      content: '';
+      position: absolute;
+      top: -4px;
+      left: -4px;
+      right: -4px;
+      bottom: -4px;
+      border: 2px solid var(--secondary-color);
+      border-radius: 4px;
+      animation: run-border 4s linear infinite;
+    }
+
+    @keyframes run-border {
+      0% {
+        clip-path: inset(0 0 100% 0);
+      }
+
+      25% {
+        clip-path: inset(0 0 0 75%);
+      }
+
+      50% {
+        clip-path: inset(100% 0 0 0);
+      }
+
+      75% {
+        clip-path: inset(0 75% 0 0);
+      }
+
+      100% {
+        clip-path: inset(0 0 100% 0);
+      }
+    }
+
+    @keyframes pulse-bg {
+
+      0%,
+      100% {
+        background-color: var(--secondary-color);
+      }
+
+      50% {
+        background-color: rgba(9, 124, 201, 0.7);
+      }
+    }
+
+    /* 分頁內容 */
+    .tab-content {
+      display: none;
+      padding: 1rem;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* 按鈕群組 */
+    .button-group {
+      margin: 1rem 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    button {
+      background-color: var(--secondary-color);
+      color: white;
+      padding: 0.5rem 1rem;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #2980b9;
+    }
+
+    .export-buttons {
+      margin: 1rem 0;
+    }
+
+    /* 內容摘要與獎金明細 */
+    .summary {
+      margin-top: 1rem;
+      padding: 1rem;
+      background-color: #f8f9fa;
+      border-radius: 4px;
+    }
+
+    .bonus-details {
+      margin-top: 1rem;
+      border: 1px solid #ddd;
+      padding: 1rem;
+      border-radius: 4px;
+    }
+
+    .bonus-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+      padding: 0.5rem;
+      border-bottom: 1px solid #eee;
+    }
+
+    .total-bonus {
+      font-size: 1.2rem;
+      font-weight: bold;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 2px solid #ddd;
+    }
+
+    /* 表格區域：僅 table 自身會有 overflow */
+    .table-container {
+      margin-top: 1rem;
+      max-height: calc(100vh - 150px);
+      /* 根據上方區塊高度調整 */
+      overflow-y: auto;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      min-width: 1500px;
+    }
+
+    /* 固定表頭 */
+    thead {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: white;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--border-color);
+      padding: 0.5rem;
+      text-align: center;
+    }
+
+    th {
+      background-color: #f2f2f2;
+    }
+
+    th.group-header {
+      background-color: #e0e0e0;
+    }
+
+    td input {
+      width: 100%;
+      padding: 0.25rem;
+      border: 1px solid var(--border-color);
+      text-align: right;
+    }
+
+    /* RWD 調整 */
+    @media (max-width: 768px) {
+      .tab-button {
+        padding: 0.5rem;
+        font-size: 0.9rem;
+      }
+
+      .table-container {
+        margin: 0 -1rem;
+      }
+
+      td input {
+        font-size: 0.9rem;
+      }
+
+      .button-group {
+        flex-direction: column;
+      }
+
+      button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>薪資計算系統</h1>
+  </header>
+  <nav>
+    <button class="tab-button active" data-tab="tab1">每日結算</button>
+    <button class="tab-button" data-tab="tab2">獎金計算</button>
+  </nav>
+  <!-- 第一分頁：每日結算 -->
+  <section id="tab1" class="tab-content active">
+    <div class="button-group">
+      <button onclick="generateTable()">產生表格</button>
+      <label for="startDate">起始日期：</label>
+      <input type="date" id="startDate">
+      <label for="endDate">結束日期：</label>
+      <input type="date" id="endDate">
+      <button onclick="calculateAndShowBonus()">計算獎金</button>
+      <button onclick="exportCSV()">匯出每日結算CSV</button>
+    </div>
+    <div class="table-container">
+      <table id="daily-table">
+        <!-- 表格內容將動態生成 -->
+      </table>
+    </div>
+  </section>
+  <!-- 第二分頁：獎金計算與統整結果 -->
+  <section id="tab2" class="tab-content">
+    <div class="summary" id="salarySummary">
+      <h2>基本資訊</h2>
+      <p>基本薪資：<span id="baseSalary">32,500</span> 元</p>
+      <p>獎金統計期間：<span id="displayPeriod"></span></p>
+      <div class="export-buttons">
+        <button onclick="exportHTML()">匯出薪資明細HTML</button>
+        <button onclick="exportImage()">匯出薪資明細圖片</button>
+      </div>
+      <div id="reconciliationSummary"></div>
+      <!-- 顯示動物難度參數 -->
+      <div id="animalFactorsDisplay"></div>
+      <div class="bonus-details" id="bonusDetails">
+        <!-- 獎金明細將動態填充 -->
+      </div>
+    </div>
+  </section>
+  <script>
+    // 全域常數設定
+    let globalStartDate, globalEndDate;
+
+    const BASE_SALARY = 32500;
+    const LINE_PAY_FEE = 0.0235;
+    const BONUS_THRESHOLDS = [
+      { min: 61500, max: 63000, bonus: 6000 },
+      { min: 63001, max: 66000, bonus: 6300 },
+      { min: 66001, max: 69000, bonus: 6600 },
+      { min: 69001, max: 72000, bonus: 6900 },
+      { min: 72001, max: 75000, bonus: 7200 },
+      { min: 75001, max: 78000, bonus: 7500 },
+      { min: 78001, max: 81000, bonus: 7800 },
+      { min: 81001, max: 84000, bonus: 8100 }
+    ];
+    const NEW_CUSTOMER_BONUS = 200;
+    // 動物難度參數
+    const ANIMAL_FACTORS = {
+      smallDog: 1,
+      mediumDog: 1.5,
+      largeDog: 2.5,
+      otherDog: 2,
+      longHairCat: 1,
+      shortHairCat: 1
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initializeDateInputs();
+      initializeTabButtons();
+      // 顯示動物難度參數於獎金計算分頁中
+      displayAnimalFactors();
+
+      // 監聽日期變更
+      document.getElementById('startDate').addEventListener('change', updateGlobalDates);
+      document.getElementById('endDate').addEventListener('change', updateGlobalDates);
+    });
+
+    // 將預設日期設為上個月
+    function initializeDateInputs() {
+      const today = new Date();
+      const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const firstDay = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), 1);
+      const lastDay = new Date(today.getFullYear(), today.getMonth(), 0);
+
+      const formatDate = (date) => {
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const dd = String(date.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      };
+
+      document.getElementById('startDate').value = formatDate(firstDay);
+      document.getElementById('endDate').value = formatDate(lastDay);
+
+      // 設定全域變數
+      updateGlobalDates();
+    }
+
+    function updateGlobalDates() {
+      const startDateStr = document.getElementById('startDate').value;
+      const endDateStr = document.getElementById('endDate').value;
+      if (startDateStr) {
+        globalStartDate = new Date(startDateStr + 'T00:00:00');
+      }
+      if (endDateStr) {
+        // 設定結束日期為當天的 23:59:59
+        globalEndDate = new Date(endDateStr + 'T23:59:59');
+      }
+      console.log('Global Dates Updated:', {
+        start: globalStartDate,
+        end: globalEndDate
+      });
+    }
+
+    function initializeTabButtons() {
+      const tabButtons = document.querySelectorAll('.tab-button');
+      tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+          tabButtons.forEach(btn => btn.classList.remove('active'));
+          button.classList.add('active');
+          document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+          document.getElementById(button.dataset.tab).classList.add('active');
+        });
+      });
+    }
+
+    // 顯示動物難度參數設定於頁面上
+    function displayAnimalFactors() {
+      const factorsHTML = `
+        <h3>動物難度因數設定</h3>
+        <ul>
+          <li>小型犬：難度 ${ANIMAL_FACTORS.smallDog} 點</li>
+          <li>中型犬：難度 ${ANIMAL_FACTORS.mediumDog} 點</li>
+          <li>大型犬：難度 ${ANIMAL_FACTORS.largeDog} 點</li>
+          <li>其他犬：難度 ${ANIMAL_FACTORS.otherDog} 點</li>
+          <li>長毛貓：難度 ${ANIMAL_FACTORS.longHairCat} 點</li>
+          <li>短毛貓：難度 ${ANIMAL_FACTORS.shortHairCat} 點</li>
+        </ul>
+      `;
+      document.getElementById('animalFactorsDisplay').innerHTML = factorsHTML;
+    }
+
+    // 產生表格
+    function generateTable() {
+      const startDateStr = document.getElementById('startDate').value;
+      const endDateStr = document.getElementById('endDate').value;
+      if (!startDateStr || !endDateStr) {
+        alert("請選擇起始日期和結束日期");
+        return;
+      }
+      const startDate = new Date(startDateStr);
+      const endDate = new Date(endDateStr);
+      if (startDate > endDate) {
+        alert("起始日期不能大於結束日期");
+        return;
+      }
+      const table = document.getElementById('daily-table');
+      table.innerHTML = `
+        <thead>
+          <tr>
+            <th rowspan="2">日期</th>
+            <th rowspan="2">星期</th>
+            <th colspan="6" class="group-header">動物隻數</th>
+            <th colspan="7" class="group-header">美容收入</th>
+            <th rowspan="2">住宿收入</th>
+            <th rowspan="2">超過17:30收入<br><small>(請同時輸入於美容收入)</small></th>
+            <th colspan="5" class="group-header">付款方式</th>
+            <th rowspan="2">新客獎勵人數</th>
+            <th rowspan="2">檢核</th>
+          </tr>
+          <tr>
+            <th>小型犬<br>(×${ANIMAL_FACTORS.smallDog})</th>
+            <th>中型犬<br>(×${ANIMAL_FACTORS.mediumDog})</th>
+            <th>大型犬<br>(×${ANIMAL_FACTORS.largeDog})</th>
+            <th>其他犬<br>(×${ANIMAL_FACTORS.otherDog})</th>
+            <th>長毛貓<br>(×${ANIMAL_FACTORS.longHairCat})</th>
+            <th>短毛貓<br>(×${ANIMAL_FACTORS.shortHairCat})</th>
+            <th>包月收入</th>
+            <th>基本收入</th>
+            <th>狗洗收入</th>
+            <th>貓洗收入</th>
+            <th>狗剪收入</th>
+            <th>貓剪收入</th>
+            <th>優惠折扣</th>
+            <th>現金</th>
+            <th>LINEPAY</th>
+            <th>轉帳</th>
+            <th>銷帳</th>
+            <th>未收</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      `;
+      const tbody = table.querySelector('tbody');
+      let currentDate = new Date(startDate);
+      const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+      while (currentDate <= endDate) {
+        const year = currentDate.getFullYear();
+        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+        const day = String(currentDate.getDate()).padStart(2, '0');
+        const dateStr = `${year}/${month}/${day}`;
+        const weekDay = weekDays[currentDate.getDay()];
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${dateStr}</td>
+          <td>${weekDay}</td>
+          <!-- 動物隻數 -->
+          <td><input type="text" name="smallDog" value="0"></td>
+          <td><input type="text" name="mediumDog" value="0"></td>
+          <td><input type="text" name="largeDog" value="0"></td>
+          <td><input type="text" name="otherDog" value="0"></td>
+          <td><input type="text" name="longHairCat" value="0"></td>
+          <td><input type="text" name="shortHairCat" value="0"></td>
+          <!-- 美容收入 -->
+          <td><input type="text" name="packageIncome" value="0"></td>
+          <td><input type="text" name="basicIncome" value="0"></td>
+          <td><input type="text" name="dogWash" value="0"></td>
+          <td><input type="text" name="catWash" value="0"></td>
+          <td><input type="text" name="dogClip" value="0"></td>
+          <td><input type="text" name="catClip" value="0"></td>
+          <td><input type="text" name="discount" value="0"></td>
+          <!-- 住宿收入 -->
+          <td><input type="text" name="stayIncome" value="0"></td>
+          <!-- 超過17:30收入 -->
+          <td><input type="text" name="after1730Income" value="0"></td>
+          <!-- 付款方式 -->
+          <td><input type="text" name="cashPayment" value="0"></td>
+          <td><input type="text" name="linePayPayment" value="0"></td>
+          <td><input type="text" name="transferPayment" value="0"></td>
+          <td><input type="text" name="clearPayment" value="0"></td>
+          <td><input type="text" name="unpaid" value="0"></td>
+          <!-- 新客獎勵人數 -->
+          <td><input type="text" name="newCustomer" value="0"></td>
+          <!-- 檢核結果 -->
+          <td class="reconciliationCell"></td>
+        `;
+        tbody.appendChild(row);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    }
+
+    // 計算統計資料
+    function calculateStatistics() {
+      console.log('Date Range:', {
+        start: globalStartDate,
+        end: globalEndDate
+      });
+      if (!globalStartDate || !globalEndDate) {
+        updateGlobalDates();
+      }
+      const rows = document.querySelectorAll('#daily-table tbody tr');
+      const allRowsData = [];
+      rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        const dateParts = cells[0].textContent.split('/');
+        // 統一使用 ISO 格式建立日期物件
+        const rowDate = new Date(`${dateParts[0]}-${dateParts[1].padStart(2, '0')}-${dateParts[2].padStart(2, '0')}T00:00:00`);
+        if (rowDate >= globalStartDate && rowDate <= globalEndDate) {
+          const data = {
+            date: rowDate,
+            weekDay: cells[1].textContent,
+            // 動物隻數
+            smallDog: Number(row.querySelector('[name="smallDog"]').value),
+            mediumDog: Number(row.querySelector('[name="mediumDog"]').value),
+            largeDog: Number(row.querySelector('[name="largeDog"]').value),
+            otherDog: Number(row.querySelector('[name="otherDog"]').value),
+            longHairCat: Number(row.querySelector('[name="longHairCat"]').value),
+            shortHairCat: Number(row.querySelector('[name="shortHairCat"]').value),
+            // 美容收入            
+            packageIncome: Number(row.querySelector('[name="packageIncome"]').value),
+            basicIncome: Number(row.querySelector('[name="basicIncome"]').value),
+            dogWash: Number(row.querySelector('[name="dogWash"]').value),
+            catWash: Number(row.querySelector('[name="catWash"]').value),
+            dogClip: Number(row.querySelector('[name="dogClip"]').value),
+            catClip: Number(row.querySelector('[name="catClip"]').value),
+            discount: Number(row.querySelector('[name="discount"]').value),
+            // 住宿收入            
+            stayIncome: Number(row.querySelector('[name="stayIncome"]').value),
+            // 超過17:30收入
+            after1730Income: Number(row.querySelector('[name="after1730Income"]').value),
+            // 付款方式（檢核時，不扣手續費）
+            cashPayment: Number(row.querySelector('[name="cashPayment"]').value),
+            linePayPayment: Number(row.querySelector('[name="linePayPayment"]').value),
+            transferPayment: Number(row.querySelector('[name="transferPayment"]').value),
+            clearPayment: Number(row.querySelector('[name="clearPayment"]').value),
+            unpaid: Number(row.querySelector('[name="unpaid"]').value),
+            // 新客獎勵人數
+            newCustomer: Number(row.querySelector('[name="newCustomer"]').value)
+          };
+
+          // 計算【基礎美容收入】 = (包月 + 基本 + 狗洗 + 貓洗 + 狗剪 + 貓剪) - 優惠折扣
+          data.baseBeauty = (data.packageIncome + data.basicIncome + data.dogWash + data.catWash + data.dogClip + data.catClip) - data.discount;
+          // 月收入（用於績效獎金計算）：基礎美容收入 + 住宿收入
+          data.totalRevenue = data.baseBeauty + data.stayIncome;
+          // 日檢核公式（不含超過17:30收入）：
+          // (基礎美容收入 + 住宿收入) - (現金 + LINEPAY + 轉帳) + 未收
+          data.dailyCheck = (data.baseBeauty + data.stayIncome) - (data.cashPayment + data.linePayPayment + data.transferPayment) + data.unpaid;
+          data.reconciliationDiff = data.dailyCheck;
+          // 更新每日檢核欄位
+          const reconCell = row.querySelector('.reconciliationCell');
+          reconCell.textContent = data.reconciliationDiff.toFixed(2);
+          reconCell.style.backgroundColor = Math.abs(data.reconciliationDiff) > 1 ? '#f8d7da' : '#d4edda';
+          // 當日動物總數
+          data.totalAnimals = data.smallDog + data.mediumDog + data.largeDog + data.otherDog + data.longHairCat + data.shortHairCat;
+          // 計算動物難度點數採用全域參數
+          data.difficultyPoints =
+            data.smallDog * ANIMAL_FACTORS.smallDog +
+            data.mediumDog * ANIMAL_FACTORS.mediumDog +
+            data.largeDog * ANIMAL_FACTORS.largeDog +
+            data.otherDog * ANIMAL_FACTORS.otherDog +
+            data.longHairCat * ANIMAL_FACTORS.longHairCat +
+            data.shortHairCat * ANIMAL_FACTORS.shortHairCat;
+          allRowsData.push(data);
+        }
+      });
+      return allRowsData;
+    }
+
+    // 計算獎金與統整數據
+    function calculateBonus(allRowsData) {
+      const bonusDetails = { baseSalary: BASE_SALARY, items: [] };
+      let periodRevenue = 0;
+      allRowsData.forEach(data => {
+        if (data.date >= globalStartDate && data.date <= globalEndDate) {
+          periodRevenue += data.totalRevenue;
+        }
+      });
+      bonusDetails.periodRevenue = periodRevenue; // 存下以便顯示
+      let performanceBonus = 0;
+      if (periodRevenue >= 61500) {
+        for (const threshold of BONUS_THRESHOLDS) {
+          if (periodRevenue >= threshold.min && periodRevenue <= threshold.max) {
+            performanceBonus = threshold.bonus;
+            break;
+          }
+        }
+        if (periodRevenue > 84000) {
+          const extraAmount = Math.floor((periodRevenue - 84000) / 1000);
+          performanceBonus = 8100 + (extraAmount * 100);
+        }
+      }
+      bonusDetails.items.push({
+        name: '績效獎金',
+        amount: performanceBonus,
+        detail: `區間總收入：${formatCurrency(periodRevenue)} 元`
+      });
+      // 新客獎勵
+      const totalNewCustomers = allRowsData.reduce((sum, data) => {
+        if (data.date >= startDate && data.date <= endDate) return sum + data.newCustomer;
+        return sum;
+      }, 0);
+      const newCustomerBonus = totalNewCustomers * NEW_CUSTOMER_BONUS;
+      bonusDetails.items.push({
+        name: '新客獎勵',
+        amount: newCustomerBonus,
+        detail: `${totalNewCustomers} 人 × ${NEW_CUSTOMER_BONUS} 元`
+      });
+      // 超過17:30額外獎金
+      const totalAfter1730 = allRowsData.reduce((sum, data) => {
+        if (data.date >= startDate && data.date <= endDate) return sum + data.after1730Income;
+        return sum;
+      }, 0);
+      bonusDetails.totalAfter1730 = totalAfter1730;
+      const extraBonus = totalAfter1730 * 0.05;
+      bonusDetails.items.push({
+        name: '超過17:30額外獎金',
+        amount: extraBonus,
+        detail: `超過17:30收入輸入總額：${formatCurrency(totalAfter1730)} 元`
+      });
+
+      // 動物獎金：難度獎金、平日與假日隻數獎金
+      let difficultyBonusTotal = 0;
+      let weekdayBonusTotal = 0;
+      let weekendBonusTotal = 0;
+      const periodData = allRowsData.filter(data =>
+        data.date >= globalStartDate && data.date <= globalEndDate
+      );
+
+      // 依星期分組 (約7天為一組，可能跨4週)
+      let currentWeek = [];
+      const weeks = [];
+      periodData.forEach((data, index) => {
+        currentWeek.push(data);
+        if ((index + 1) % 7 === 0 || index === periodData.length - 1) {
+          weeks.push(currentWeek);
+          currentWeek = [];
+        }
+      });
+      // 收集每週動物難度細部資料
+      let weeksDetail = [];
+      weeks.forEach((weekData, index) => {
+        const weekDifficultyPoints = weekData.reduce((sum, data) => sum + data.difficultyPoints, 0);
+        const extraPoints = Math.max(0, weekDifficultyPoints - 30);
+        const weekBonus = extraPoints * 50;
+        weeksDetail.push({
+          week: index + 1,
+          totalDifficulty: weekDifficultyPoints,
+          extraPoints: extraPoints,
+          weekBonus: weekBonus
+        });
+        difficultyBonusTotal += weekBonus;
+        // 平日與假日獎金計算
+        weekData.forEach(data => {
+          const day = data.date.getDay(); // 1~5：平日; 0,6：假日
+          if (day >= 1 && day <= 5 && data.totalAnimals > 7) {
+            weekdayBonusTotal += (data.totalAnimals - 7) * 50;
+          }
+          if ((day === 0 || day === 6) && data.totalAnimals > 9) {
+            weekendBonusTotal += (data.totalAnimals - 9) * 50;
+          }
+        });
+      });
+      bonusDetails.weeksDifficulty = weeksDetail;
+      bonusDetails.items.push({
+        name: '動物難度獎金',
+        amount: difficultyBonusTotal,
+        detail: `每週難度點超過30點，每點50元`
+      });
+      bonusDetails.items.push({
+        name: '平日隻數獎金',
+        amount: weekdayBonusTotal,
+        detail: `平日每日超過7隻，每隻50元`
+      });
+      bonusDetails.items.push({
+        name: '假日隻數獎金',
+        amount: weekendBonusTotal,
+        detail: `假日每日超過9隻，每隻50元`
+      });
+
+      // 收集每日動物隻數明細
+      bonusDetails.dailyAnimals = periodData.map(data => {
+        return { date: data.date, totalAnimals: data.totalAnimals };
+      });
+
+      // 收入統整
+      const periodIncome = periodData.reduce((totals, data) => {
+        totals.cash += data.cashPayment;
+        totals.transfer += data.transferPayment;
+        totals.linePay += data.linePayPayment;
+        return totals;
+      }, { cash: 0, transfer: 0, linePay: 0 });
+      const effectiveLinePay = periodIncome.linePay * (1 - LINE_PAY_FEE);
+      const totalConsolidatedIncome = periodIncome.cash + periodIncome.transfer + effectiveLinePay;
+      bonusDetails.consolidatedIncome = totalConsolidatedIncome;
+      const clearUnpaid = periodData.reduce((sum, data) => sum + data.clearPayment + data.unpaid, 0);
+      bonusDetails.periodClearUnpaid = clearUnpaid;
+      bonusDetails.totalBonus = bonusDetails.items.reduce((sum, item) => sum + item.amount, 0);
+      return bonusDetails;
+    }
+
+    // 顯示獎金明細與統整結果
+    // 修改 displayBonusDetails 函式中的補充明細區塊
+    function displayBonusDetails(bonusDetails) {
+      const startDateStr = document.getElementById('startDate').value;
+      const endDateStr = document.getElementById('endDate').value;
+      const dateFormatOptions = { year: 'numeric', month: '2-digit', day: '2-digit' };
+      const startDate = new Date(startDateStr);
+      const endDate = new Date(endDateStr);
+      const formattedStartDate = startDate.toLocaleDateString('zh-TW', dateFormatOptions);
+      const formattedEndDate = endDate.toLocaleDateString('zh-TW', dateFormatOptions);
+      document.getElementById('baseSalary').textContent = formatCurrency(bonusDetails.baseSalary);
+      document.getElementById('displayPeriod').textContent = `${formattedStartDate} ~ ${formattedEndDate}`;
+      const bonusContainer = document.getElementById('bonusDetails');
+      bonusContainer.innerHTML = `
+        <h3>獎金明細</h3>
+        <div class="bonus-details">
+          ${bonusDetails.items.map(item => `
+            <div class="bonus-item">
+              <span>${item.name}</span>
+              <span>${formatCurrency(item.amount)} 元</span>
+              <small>(${item.detail})</small>
+            </div>
+          `).join('')}
+          <div class="total-bonus">
+            <div>基本薪資：${formatCurrency(bonusDetails.baseSalary)} 元</div>
+            <div>獎金總額：${formatCurrency(bonusDetails.totalBonus)} 元</div>
+            <div>薪資總計：${formatCurrency(bonusDetails.baseSalary + bonusDetails.totalBonus)} 元</div>
+          </div>
+        </div>
+        <div class="supplement-details">
+          <h3>補充明細</h3>
+          <p>【績效獎金】區間總收入：${formatCurrency(bonusDetails.periodRevenue)} 元</p>
+          <p>【超過17:30收入】輸入總額：${formatCurrency(bonusDetails.totalAfter1730)} 元</p>
+          <h4>動物難度獎金 - 分週明細：</h4>
+          <ul>
+            ${bonusDetails.weeksDifficulty.map(week => `
+              <li>第${week.week}周：總難度點 ${week.totalDifficulty}，超出點數 ${week.extraPoints}，本週獎金 ${formatCurrency(week.weekBonus)} 元</li>
+            `).join('')}
+          </ul>
+          <h4>每日動物隻數（按週顯示）：</h4>
+          ${generateDailyAnimalsTable(bonusDetails.dailyAnimals)}
+        </div>
+      `;
+      const reconciliationDiv = document.getElementById('reconciliationSummary');
+      reconciliationDiv.innerHTML = `
+        <h3>收入統整</h3>
+        <p>現金收入 + 轉帳收入 + LINEPAY收入(扣除手續費) = ${formatCurrency(bonusDetails.consolidatedIncome)} 元</p>
+        <p>區間內銷帳 + 未收總額 = ${formatCurrency(bonusDetails.periodClearUnpaid)} 元</p>
+      `;
+    }
+
+    // 新增一個輔助函式，產生每日動物隻數 table（每組7天）
+    function generateDailyAnimalsTable(dailyAnimals) {
+      const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+      let tableHTML = '<table border="1" cellspacing="0" cellpadding="5" style="width:100%; text-align:center;"><tbody>';
+
+      for (let i = 0; i < dailyAnimals.length; i += 7) {
+        const weekData = dailyAnimals.slice(i, i + 7);
+        // 第一列：顯示日期 (yyyy/mm/dd(星期x))
+        tableHTML += '<tr>';
+        weekData.forEach(item => {
+          const d = item.date;
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          const weekDay = weekDays[d.getDay()];
+          tableHTML += `<td>${yyyy}/${mm}/${dd}(${weekDay})</td>`;
+        });
+        // 若不足7天則補空白
+        if (weekData.length < 7) {
+          for (let j = 0; j < 7 - weekData.length; j++) {
+            tableHTML += '<td></td>';
+          }
+        }
+        tableHTML += '</tr>';
+
+        // 第二列：顯示該天總隻數
+        tableHTML += '<tr>';
+        weekData.forEach(item => {
+          tableHTML += `<td>${item.totalAnimals} 隻</td>`;
+        });
+        if (weekData.length < 7) {
+          for (let j = 0; j < 7 - weekData.length; j++) {
+            tableHTML += '<td></td>';
+          }
+        }
+        tableHTML += '</tr>';
+      }
+      tableHTML += '</tbody></table>';
+      return tableHTML;
+    }
+
+    function calculateAndShowBonus() {
+      const stats = calculateStatistics();
+      const bonusDetails = calculateBonus(stats);
+      displayBonusDetails(bonusDetails);
+      document.querySelector('[data-tab="tab2"]').click();
+    }
+
+    // 匯出 CSV
+    function exportCSV() {
+      const header = ["日期", "星期", "小型犬", "中型犬", "大型犬", "其他犬", "長毛貓", "短毛貓", "包月收入", "基本收入", "狗洗收入", "貓洗收入", "狗剪收入", "貓剪收入", "優惠折扣", "住宿收入", "超過17:30收入", "現金", "LINEPAY", "轉帳", "銷帳", "未收", "新客獎勵人數", "檢核"];
+      let csvContent = header.map(h => `"${h}"`).join(",") + "\r\n";
+      const rows = document.querySelectorAll('#daily-table tbody tr');
+      rows.forEach(row => {
+        const cells = row.querySelectorAll("td");
+        let rowData = [];
+        cells.forEach(cell => {
+          const input = cell.querySelector("input");
+          if (input) {
+            rowData.push('"' + input.value.replace(/"/g, '""') + '"');
+          } else {
+            rowData.push('"' + cell.textContent.replace(/"/g, '""') + '"');
+          }
+        });
+        csvContent += rowData.join(",") + "\r\n";
+      });
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `daily_settlement_${startDate}_${endDate}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // 匯出 HTML 檔
+    function exportHTML() {
+      const summaryDiv = document.getElementById('salarySummary').innerHTML;
+      const blob = new Blob([summaryDiv], { type: 'text/html;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `salary_details_${startDate}_${endDate}.html`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // 匯出圖片（使用 html2canvas）
+    function exportImage() {
+      const summaryDiv = document.getElementById('salarySummary');
+      html2canvas(summaryDiv).then(canvas => {
+        canvas.toBlob(function (blob) {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.setAttribute("href", url);
+          link.setAttribute("download", `salary_details_${startDate}_${endDate}.png`);
+          link.style.visibility = 'hidden';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        });
+      });
+    }
+
+    function formatCurrency(number) {
+      return new Intl.NumberFormat('zh-TW', {
+        style: 'decimal',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(Math.round(number));
+    }
+  </script>
+</body>
+
+</html>
